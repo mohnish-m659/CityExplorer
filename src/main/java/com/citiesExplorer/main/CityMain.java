@@ -14,6 +14,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.FillLayout;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
@@ -56,10 +57,10 @@ public class CityMain {
 		try {
             if (initialized.get()) {
                 splash.dispose();
-                Shell shell = new Shell(display);
-                shell.setLayout(new FillLayout());
+                Shell shell = new Shell(display, SWT.SHELL_TRIM);
+                shell.setLayout(new GridLayout(1, false));
                 shell.setText("Cities Explorer");
-                shell.setSize(700, 600);
+                //shell.setSize(800, 500);
 
                 CityGUI.getInstance().create(shell);
 
