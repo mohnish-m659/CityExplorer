@@ -1,16 +1,20 @@
 package com.citiesExplorer.main;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.query.Query;
 
+import com.citiesExplorer.main.CityGUI.SearchSortField;
 import com.citiesExplorer.utils.HibernateUtil;
 
 public class CityDataSource {
@@ -41,17 +45,49 @@ public class CityDataSource {
 		return instance;
 	}
 
-	public List<City> getCities(int i, int pageSize, Map<String, String> criteria, Map<String, String> sortOrder) {
+	public List<City> getCities(int i, int pageSize, Map<SearchSortField, String> criteria) {
 		Transaction transaction = null;
+		List<City> cities = null;
 		try (Session session = HibernateUtil.getSessionFactory().openSession()) {
 			transaction = session.beginTransaction();
 			CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
+			CriteriaQuery<City> critQuery = criteriaBuilder.createQuery(City.class);
+			Root<City> root = critQuery.from(City.class);
 			
+			List<Predicate> filters = new ArrayList<>();
+			Predicate cityFilter = null;
+			String cityValue = criteria.get(SearchSortField.CITY);
+			if(StringUtils.isNotBlank(cityValue)) {
+				cityFilter = criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), getLike(cityValue));
+				filters.add(cityFilter);
+			}
+			
+			Predicate countryFilter = null;
+			String countryValue = criteria.get(SearchSortField.COUNTRY);
+			if(StringUtils.isNotBlank(countryValue)) {
+				countryFilter = criteriaBuilder.like(criteriaBuilder.lower(root.get("country")), getLike(countryValue));
+				filters.add(countryFilter);
+			}
+			
+			critQuery.select(root).where(criteriaBuilder.and(filters.toArray(new Predicate[0])));
+			
+			String sortBy = criteria.get(SearchSortField.SORTBY);
+			critQuery.orderBy(criteriaBuilder.asc(root.get(sortBy)));
+			
+			Query<City> query = session.createQuery(critQuery);
+			cities = query.setFirstResult(i).setMaxResults(pageSize).getResultList();
 			
 		}catch (Exception e) {
-			// TODO: handle exception
+			if(transaction!=null) {
+				transaction.rollback();
+			}
+			e.printStackTrace();
 		}
-		return null;
+		return cities;
+	}
+
+	private String getLike(String string) {
+		return "%"+StringUtils.lowerCase(string)+"%";
 	}
 
 	public int getCount() {

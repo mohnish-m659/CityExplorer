@@ -5,10 +5,13 @@ import java.util.Map;
 
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.MouseAdapter;
+import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.layout.RowLayout;
+import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Event;
@@ -30,14 +33,19 @@ public class CityGUI {
 	
 	Label sortByLabel;
 	Combo sortByCombo;
+	Button searchBtn;
 	
 	TableViewer viewer;
-	private Map<String, String> criteria = new HashMap<>();
-	private Map<String, String> sortOrder = new HashMap<>();
 	
-	private int widthHint = 600;
+	public enum SearchSortField{
+		CITY, COUNTRY, SORTBY;
+	}
 	
-	String[] columns = {"City", "Country", "Population", "Longitude", "Latitude"};
+	private int widthHint = 400;
+	
+	String[] columns = {"S.no", "City", "Country", "Population", "Longitude", "Latitude"};
+	String[] sortByValues = {"name", "country", "population"};
+	String[] sortByDisplayValues = {"City", "Country", "Population"};
 	
 	private static CityGUI instance = new CityGUI();
 	
@@ -52,10 +60,24 @@ public class CityGUI {
 		
 		initSearchSortForm(parentComposite);
 		initTable(parentComposite);
-		
-		parentComposite.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
+		initListeners();
 	}
 	
+	private void initListeners() {
+		searchBtn.addMouseListener(new MouseAdapter() {
+
+			@Override
+			public void mouseDown(MouseEvent e) {
+				synchronized (this) {
+					CityTableModel.invalidateCache();
+					viewer.getTable().setItemCount(1);
+					viewer.refresh();
+				}
+			}
+			
+		});
+	}
+
 	private void initSearchSortForm(Composite parentComposite) {
 		Composite parent = new Composite(parentComposite, SWT.None);
 		parent.setLayout(new FillLayout());
@@ -81,15 +103,31 @@ public class CityGUI {
 		sortByLabel.setText("Sort By");
 		
 		sortByCombo = new Combo(group, SWT.DROP_DOWN | SWT.READ_ONLY);
-		sortByCombo.setItems("City", "Country", "Population");
+		sortByCombo.setItems(sortByDisplayValues);
 		sortByCombo.select(0);
 		sortByCombo.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
 		
-		GridData parentGd = new GridData(SWT.FILL, SWT.TOP, true, true);
+		searchBtn = new Button(group, SWT.PUSH);
+		searchBtn.setText("Search");
+		
+		GridData parentGd = new GridData(SWT.FILL, SWT.FILL, true, true);
 		parentGd.heightHint = 130;
 		parentGd.widthHint = widthHint;
 		parent.setLayoutData(parentGd);
 		
+	}
+	
+	private Map<SearchSortField, String> getSearchSortCriteria(){
+		Map<SearchSortField, String> map = new HashMap<>();
+		String city = cityText.getText().trim();
+		String country = countryText.getText().trim();
+		int indx = sortByCombo.getSelectionIndex();
+		
+		map.put(SearchSortField.CITY, city);
+		map.put(SearchSortField.COUNTRY, country);
+		map.put(SearchSortField.SORTBY, sortByValues[indx]);
+		
+		return map;
 	}
 
 	private void initTable(Composite parent) {
@@ -105,29 +143,49 @@ public class CityGUI {
 			
 			@Override
 			public void handleEvent(Event event) {
-				TableItem item = (TableItem) event.item;
-                int index = table.indexOf(item);
-                try {
-                	City city = CityTableModel.getDataAt(index, criteria, sortOrder);
-                	item.setText(getData(city));
-				} catch (IndexOutOfBoundsException e) {
-					System.out.println("Reached End of the data set update count");
-					table.setItemCount(index);
+				synchronized (this) {
+					TableItem item = (TableItem) event.item;
+	                int index = table.indexOf(item);
+	                try {
+	                	System.out.println("Getting value for row index= " + index);
+	                	City city = CityTableModel.getDataAt(index, getSearchSortCriteria());
+	                	table.setItemCount(setTableRowCount(table));
+	                	if(!item.isDisposed()) {
+	                		item.setText(getData(city, index));
+	                	}
+					} catch (Exception e) {
+						//item.setText("");
+						System.out.println("Exception " + e.getMessage());
+					}
 				}
 			}
 		});
-		table.setItemCount(CityTableModel.getRowCount());
+		table.setItemCount(1);
 		
 		GridData tableGd = new GridData(SWT.FILL, SWT.FILL, true, true);
+		tableGd.heightHint = 400;
 		viewer.getControl().setLayoutData(tableGd);
-		GridData parentGd = new GridData(SWT.FILL, SWT.CENTER, true, true);
-		parentGd.heightHint = 400;
+		GridData parentGd = new GridData(SWT.FILL, SWT.FILL, true, true);
 		parentGd.widthHint = widthHint;
 		viewerParent.setLayoutData(parentGd);
 	}
 
-	protected String[] getData(City city) {
-		return new String[] {city.getName(), city.getCountry(), String.valueOf(city.getPopulation()),
+	protected int setTableRowCount(Table table) {
+		int currentRowCount = table.getItemCount();
+		int tableDataRowCount = CityTableModel.getRowCount();
+		
+		if(currentRowCount < tableDataRowCount) {
+			int increase = tableDataRowCount - (currentRowCount-1);
+			System.out.println("current row count = " + currentRowCount + " increase= " + increase);
+			currentRowCount = currentRowCount + increase;
+			System.out.println("Row count after increase = " + currentRowCount);
+		}
+		
+		return currentRowCount;
+	}
+
+	protected String[] getData(City city, int index) {
+		return new String[] {Integer.toString(index + 1) ,city.getName(), city.getCountry(), String.valueOf(city.getPopulation()),
 				String.valueOf(city.getLongitude()), String.valueOf(city.getLatitude())};
 	}
 

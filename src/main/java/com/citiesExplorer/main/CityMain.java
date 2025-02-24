@@ -57,8 +57,8 @@ public class CityMain {
 		try {
             if (initialized.get()) {
                 splash.dispose();
-                Shell shell = new Shell(display, SWT.SHELL_TRIM);
-                shell.setLayout(new GridLayout(1, false));
+                Shell shell = new Shell(display, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+                shell.setLayout(new FillLayout());
                 shell.setText("Cities Explorer");
                 //shell.setSize(800, 500);
 
